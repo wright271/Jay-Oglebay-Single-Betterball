@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Crispin Cup</title>
+<title>Oglebay Cup</title>
 <style>
 :root{
   --brand:#0d5132;
@@ -112,13 +112,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Ar
 .hc-tot .rel.even{color:var(--faint)}
 .hc-tot .rel.eagle{color:#8a6400}
 .hc-tot.blank{color:var(--faint);font-weight:600;font-size:11px}
-.hc-players{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.hc-players{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .pcell{border:1px solid var(--border);border-radius:6px;padding:5px;text-align:center;background:#fafbfa}
 .pcell.single{border-color:var(--brand);background:#f0f6f2}
-.pcell.counts{border-color:var(--gold);background:var(--gold-bg)}
+.pcell.scr{border-color:var(--gold);background:var(--gold-bg)}
 .pl{font-size:10px;font-weight:700;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px;height:13px}
 .pcell.single .pl{color:var(--brand)}
+.pcell.scr .pl{color:#8a6400}
 .tagS{display:inline-block;background:var(--brand);color:#fff;font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;letter-spacing:.4px;vertical-align:1px}
+.tagC{display:inline-block;background:#8a6400;color:#fff;font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;letter-spacing:.4px;vertical-align:1px}
 .hinp{height:40px;font-size:18px;font-weight:600;text-align:center;border:1px solid var(--border);border-radius:5px;background:#fff;color:var(--text);width:100%}
 .hinp:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 2px rgba(13,81,50,.15)}
 .seg-sub{display:flex;justify-content:space-between;align-items:center;background:#f3f6f4;padding:8px 12px;font-size:11.5px;font-weight:600;color:var(--muted);border-top:1px solid var(--border)}
@@ -136,6 +138,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Ar
 .tc-cap{font-size:10px;color:#8fb3a0;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px}
 .tc-name{font-size:17px;font-weight:700}
 .tc-pts{font-size:34px;font-weight:700;line-height:1.15;margin-top:2px}
+.tc-gap{font-size:12px;color:#a8c9b8;margin-top:6px}
 .lb-tbl{width:100%;border-collapse:collapse;font-size:13px}
 .lb-tbl td{padding:9px 10px;border-bottom:1px solid #edf0f4;vertical-align:middle}
 .lb-tbl tr:last-child td{border-bottom:none}
@@ -171,7 +174,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Ar
 .par-totals{font-size:12px;color:var(--muted);margin:10px 2px}
 .nine-hd{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin:14px 2px 8px}
 .reset-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13px;font-weight:600}
-.bulk{width:100%;min-height:190px;padding:10px;border:1px solid var(--border);border-radius:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.6;background:#fafbfa}
+.bulk{width:100%;min-height:110px;padding:10px;border:1px solid var(--border);border-radius:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.6;background:#fafbfa}
 .conn{position:fixed;bottom:10px;right:10px;font-size:10px;font-weight:700;letter-spacing:.4px;padding:4px 10px;border-radius:12px;z-index:50}
 .conn.on{background:var(--green-bg);color:var(--green)}
 .conn.off{background:var(--over-bg);color:var(--over)}
@@ -197,17 +200,17 @@ const firebaseConfig = {
   messagingSenderId: "501915665674",
   appId: "1:501915665674:web:85bde07e4c2742b86726f3"
 };
-const DB_PATH = 'crispin';            // change if you want a fresh, empty event
+const DB_PATH = 'crispin';            // must match the key in your database rules
 const ADMIN_PASSWORD = "captain";     // change this before you share the link
 /* ============================================================ */
 
-const NUM_TEAMS   = 20;
+const NUM_TEAMS   = 2;
 const TEAM_SIZE   = 3;
 const NUM_HOLES   = 18;
 const SEG_LEN     = 6;                // single changes every 6 holes
 const NUM_SEGS    = NUM_HOLES / SEG_LEN;
 const COURSE_NAME = "Crispin Golf Course";
-const EVENT_DEFAULT = "Crispin Cup";
+const EVENT_DEFAULT = "Oglebay Cup";
 
 /* Crispin Golf Course, Oglebay — Wheeling, WV. Out 36 / In 35 / Par 71 */
 const PAR_DEFAULT  = [4,3,4,5,3,4,3,5,5, 3,4,5,3,4,4,4,4,4];
@@ -223,7 +226,7 @@ function defaultState(){
     teams: Array.from({length:NUM_TEAMS},()=>({
       name: '', p1:'', p2:'', p3:'',
       singles: {},   // s0 / s1 / s2  ->  0 | 1 | 2
-      scores: {}     // "h0p1" -> strokes
+      scores: {}     // "h0p1" -> single's gross ; "h0sc" -> pair's scramble score
     })),
     par: PAR_DEFAULT.slice()
   };
@@ -317,7 +320,6 @@ function playerName(t, pi){
   const v = String(t[PKEYS[pi]]||'').trim();
   return v || ('Player ' + (pi+1));
 }
-function hasPlayer(t, pi){ return !!String(t[PKEYS[pi]]||'').trim(); }
 function shortName(t, pi){
   const v = String(t[PKEYS[pi]]||'').trim();
   if (!v) return 'P' + (pi+1);
@@ -340,44 +342,42 @@ function totalTeamPar(){ return state.par.reduce((a,b)=>a+b,0) * 2; }
 
 /* ---------- Scoring engine ----------
    Each hole a team posts TWO scores:
-     1. the designated single's gross score
-     2. the better ball of the other two players
-   Team hole score = single + better ball, played against double par. */
+     1. the designated single's own gross score
+     2. the scramble score of the other two players
+   Team hole score = single + scramble, played against double par. */
 function scoreOf(t, h, pi){
   const v = parseInt(t.scores['h'+h+'p'+pi]);
   return (v>0) ? v : null;
 }
+function scrambleOf(t, h){
+  const v = parseInt(t.scores['h'+h+'sc']);
+  return (v>0) ? v : null;
+}
 function holeResult(t, h){
   const sIdx = t.singles['s'+segOf(h)];
-  const res = { sIdx, single:null, bb:null, bbIdx:null, total:null, par:teamPar(h), rel:0, complete:false, any:false };
+  const res = { sIdx, single:null, scr:null, total:null, par:teamPar(h), rel:0, complete:false, any:false };
+  res.scr = scrambleOf(t, h);
   if (sIdx===null || sIdx===undefined) {
-    res.any = PKEYS.some((_,pi)=>scoreOf(t,h,pi)!==null);
+    res.any = res.scr!==null || PKEYS.some((_,pi)=>scoreOf(t,h,pi)!==null);
     return res;
   }
   res.single = scoreOf(t, h, sIdx);
-  let best = null, bestIdx = null;
-  for (let pi=0; pi<TEAM_SIZE; pi++){
-    if (pi===sIdx) continue;
-    const v = scoreOf(t, h, pi);
-    if (v!==null && (best===null || v<best)){ best = v; bestIdx = pi; }
-  }
-  res.bb = best; res.bbIdx = bestIdx;
-  res.any = res.single!==null || best!==null;
-  if (res.single!==null && best!==null){
-    res.total = res.single + best;
+  res.any = res.single!==null || res.scr!==null;
+  if (res.single!==null && res.scr!==null){
+    res.total = res.single + res.scr;
     res.rel = res.total - res.par;
     res.complete = true;
   }
   return res;
 }
 function teamResult(t){
-  let strokes=0, parSum=0, thru=0, lastHole=0, partial=false;
+  let strokes=0, parSum=0, thru=0, partial=false;
   for (let h=0; h<NUM_HOLES; h++){
     const r = holeResult(t, h);
-    if (r.complete){ strokes+=r.total; parSum+=r.par; thru++; lastHole=h+1; }
+    if (r.complete){ strokes+=r.total; parSum+=r.par; thru++; }
     else if (r.any) partial = true;
   }
-  return { strokes, parSum, thru, lastHole, partial,
+  return { strokes, parSum, thru, partial,
            toPar: thru ? strokes-parSum : 0,
            started: thru>0 || partial,
            done: thru===NUM_HOLES };
@@ -390,13 +390,23 @@ function segResult(t, s){
   });
   return { strokes, parSum, n, toPar: n ? strokes-parSum : 0 };
 }
+/* A player's gross over the six holes they played as the single */
 function playerTotal(t, pi){
   let strokes=0, n=0;
   for (let h=0;h<NUM_HOLES;h++){
+    if (t.singles['s'+segOf(h)] !== pi) continue;
     const v = scoreOf(t,h,pi);
     if (v!==null){ strokes+=v; n++; }
   }
   return { strokes, n };
+}
+function scrambleTotal(t){
+  let strokes=0, parSum=0, n=0;
+  for (let h=0;h<NUM_HOLES;h++){
+    const v = scrambleOf(t,h);
+    if (v!==null){ strokes+=v; parSum+=state.par[h]; n++; }
+  }
+  return { strokes, parSum, n, toPar: n ? strokes-parSum : 0 };
 }
 function duplicateSingles(t){
   const used = [];
@@ -434,7 +444,7 @@ function render(){
     <div class="hdr-top">
       <img class="hdr-logo" src="./image.png" alt="" onerror="this.style.display='none'">
       <div class="hdr-title">${esc(state.eventName)}</div>
-      <div class="hdr-sub">${esc(COURSE_NAME)} · ${NUM_TEAMS} Teams · 60 Players · Single + Better Ball</div>
+      <div class="hdr-sub">${esc(COURSE_NAME)} · ${NUM_TEAMS} Teams · ${NUM_TEAMS*TEAM_SIZE} Players · Single + Scramble</div>
     </div>
     <div class="hdr-lead">`;
   if (leader && leader.r.thru>0){
@@ -468,7 +478,7 @@ function render(){
 }
 
 function renderTeams(){
-  let html = `<div class="banner"><b>Format:</b> each threesome posts two scores per hole — one designated <b>single</b>, plus the <b>better ball</b> of the other two. The single changes every 6 holes (holes 1, 7 and 13). Par is doubled: <b>${totalTeamPar()}</b> for the round.</div>`;
+  let html = `<div class="banner"><b>Format:</b> each threesome posts two scores per hole — one designated <b>single</b> playing his own ball, plus a <b>scramble</b> between the other two. The single changes every 6 holes (holes 1, 7 and 13). Par is doubled: <b>${totalTeamPar()}</b> for the round.</div>`;
   html += `<div class="sess-meta">Tap your team to pick your single and enter scores.</div>`;
   html += `<div class="card">`;
   state.teams.forEach((t,i)=>{
@@ -501,13 +511,13 @@ function renderScorecard(){
   let html = `
   <div class="sc-top">
     <button class="back" onclick="closeScore()">&#8592; All teams</button>
-    <div class="sc-fmt">Team ${i+1} of ${NUM_TEAMS} · Single + Better Ball</div>
+    <div class="sc-fmt">Team ${i+1} of ${NUM_TEAMS} · Single + Scramble</div>
     <div class="sc-team">${esc(teamName(t,i))}</div>
     <div class="sc-status">
       <span class="lbl">Team score</span>
       <span class="val">${r.thru>0 ? fmtRel(r.toPar) + ' · ' + r.strokes + ' strokes · thru ' + r.thru + (r.done?' (final)':'') : 'NOT STARTED'}</span>
     </div>
-    <div class="fmt-note">Enter all three players' gross scores on every hole. The app adds the <b>single's</b> score to the <b>better ball</b> of the other two and plays it against double par (${totalTeamPar()} for the round). If a partner picks up, leave their box blank.</div>
+    <div class="fmt-note">Two boxes per hole: the <b>single's</b> own gross score, and the <b>scramble</b> score the other two make together (both tee off, play the best ball in, one score). They add up against double par — ${totalTeamPar()} for the round.</div>
   </div>`;
 
   if (duplicateSingles(t)){
@@ -516,7 +526,7 @@ function renderScorecard(){
 
   for (let s=0; s<NUM_SEGS; s++) html += renderSegment(i, t, s);
 
-  html += `<div class="nine-hd">Individual gross (all 18)</div><div class="ptot">`;
+  html += `<div class="nine-hd">Gross as the single (6 holes each)</div><div class="ptot">`;
   for (let pi=0; pi<TEAM_SIZE; pi++){
     const pt = playerTotal(t, pi);
     html += `<div class="pc">
@@ -526,6 +536,13 @@ function renderScorecard(){
     </div>`;
   }
   html += `</div>`;
+
+  const st = scrambleTotal(t);
+  html += `<div class="nine-hd">Scramble side</div>
+    <div class="card"><div class="seg-sub" style="border-top:none">
+      <span>${st.n}/${NUM_HOLES} holes posted</span>
+      <span>${st.n ? `<b>${st.strokes}</b> vs par ${st.parSum} · ${fmtRel(st.toPar)}` : '—'}</span>
+    </div></div>`;
 
   html += `<div style="margin-top:16px"><button class="btn" onclick="closeScore()">Done — back to teams</button></div>`;
   return html;
@@ -552,8 +569,8 @@ function renderSegment(teamIdx, t, s){
       <label>Single for holes ${from}–${to}</label>
       <select onchange="setSingle(${teamIdx},${s},this.value)">${opts}</select>
       <div class="seg-bb">${picked
-        ? `Better ball: <b>${partners[0]}</b> &amp; <b>${partners[1]}</b>`
-        : `Pick the single to unlock scoring for these six holes. The other two automatically become the better-ball pair.`}</div>
+        ? `Scramble: <b>${partners[0]}</b> &amp; <b>${partners[1]}</b>`
+        : `Pick the single to unlock scoring for these six holes. The other two automatically become the scramble pair.`}</div>
     </div>
     <div class="seg-holes">`;
 
@@ -575,21 +592,11 @@ function holeHtml(teamIdx, t, h, picked, sIdx){
     if (hr.rel <= -2) rc = 'eagle';
     tot = `<div class="hc-tot">${hr.total}<span class="rel ${rc}">${fmtRel(hr.rel)}</span></div>`;
   } else if (hr.any){
-    tot = `<div class="hc-tot blank">needs ${hr.single===null?'single':'partner'}</div>`;
+    tot = `<div class="hc-tot blank">needs ${hr.single===null?'single':'scramble'}</div>`;
   }
 
-  let cells = '';
-  for (let pi=0; pi<TEAM_SIZE; pi++){
-    const val = t.scores['h'+h+'p'+pi];
-    const isSingle = picked && pi===sIdx;
-    const counts = picked && hr.bbIdx===pi;
-    cells += `
-      <div class="pcell ${isSingle?'single':''} ${counts?'counts':''}">
-        <div class="pl">${esc(shortName(t,pi))}${isSingle?' <span class="tagS">S</span>':''}</div>
-        <input class="hinp" id="in_${teamIdx}_${h}_${pi}" type="number" inputmode="numeric" min="1" max="15"
-          value="${val!==undefined&&val!==null?val:''}" oninput="setScore(${teamIdx},${h},${pi},this.value)">
-      </div>`;
-  }
+  const singleVal = picked ? t.scores['h'+h+'p'+sIdx] : '';
+  const scrVal = t.scores['h'+h+'sc'];
 
   return `<div class="hcard ${picked?'':'locked'}">
     <div class="hc-hd">
@@ -597,7 +604,18 @@ function holeHtml(teamIdx, t, h, picked, sIdx){
       <div class="hc-par">par ${state.par[h]} · team ${teamPar(h)} · hcp ${HOLE_HCP[h]}</div>
       ${tot}
     </div>
-    <div class="hc-players">${cells}</div>
+    <div class="hc-players">
+      <div class="pcell single">
+        <div class="pl">${picked?esc(shortName(t,sIdx)):'Single'} <span class="tagS">S</span></div>
+        <input class="hinp" id="in_${teamIdx}_${h}_s" type="number" inputmode="numeric" min="1" max="15"
+          value="${singleVal!==undefined&&singleVal!==null?singleVal:''}" oninput="setSingleScore(${teamIdx},${h},this.value)">
+      </div>
+      <div class="pcell scr">
+        <div class="pl">Scramble <span class="tagC">2</span></div>
+        <input class="hinp" id="in_${teamIdx}_${h}_c" type="number" inputmode="numeric" min="1" max="15"
+          value="${scrVal!==undefined&&scrVal!==null?scrVal:''}" oninput="setScrambleScore(${teamIdx},${h},this.value)">
+      </div>
+    </div>
   </div>`;
 }
 
@@ -606,11 +624,17 @@ function renderBoard(){
   const leader = rk[0];
   let html = '';
   if (leader && leader.r.thru>0){
+    let gap = '';
+    if (rk.length>1 && rk[1].r.thru>0){
+      const d = rk[1].r.toPar - leader.r.toPar;
+      gap = d===0 ? 'All square' : ('Leading by ' + d);
+    }
     html += `
     <div class="total-card">
       <div class="tc-cap">Leader</div>
       <div class="tc-name">${esc(teamName(leader.team, leader.idx))}</div>
       <div class="tc-pts">${fmtRel(leader.r.toPar)} <span style="font-size:14px;font-weight:600;color:#8fb3a0">thru ${leader.r.thru}</span></div>
+      ${gap?`<div class="tc-gap">${esc(gap)}</div>`:''}
     </div>`;
   }
   html += `<div class="card">
@@ -668,11 +692,11 @@ function renderAdmin(){
   if (adminTab==='bulk'){
     html += `<div class="sess-meta">One team per line, players separated by commas. Up to ${NUM_TEAMS} lines. An optional team name goes first with a colon:<br>
       <code>Smith, Jones, Brown</code><br><code>The Ringers: Smith, Jones, Brown</code></div>`;
-    html += `<textarea class="bulk" id="bulkbox" placeholder="Smith, Jones, Brown\nDoe, Rivera, Chen\n..."></textarea>`;
+    html += `<textarea class="bulk" id="bulkbox" placeholder="Smith, Jones, Brown\nDoe, Rivera, Chen"></textarea>`;
     html += `<div style="margin-top:10px;display:flex;gap:8px;align-items:center">
       <button class="btn" onclick="applyBulk()">Apply roster</button>
       <button class="btn ghost sm" onclick="fillBulk()">Load current</button>
-      <span class="savemsg" style="font-size:12px;color:var(--green);font-weight:600">${esc(bulkMsg)}</span>
+      <span style="font-size:12px;color:var(--green);font-weight:600">${esc(bulkMsg)}</span>
     </div>`;
   }
 
@@ -720,14 +744,23 @@ function tryPwd(){
   else { el.value=''; el.placeholder='Wrong password'; }
 }
 
-function setScore(idx, hole, pi, val){
+function clampScore(val){
   const n = parseInt(val);
-  const v = (val === '' || isNaN(n)) ? null : Math.max(1, Math.min(15, n));
-  const key = 'h'+hole+'p'+pi;
+  return (val === '' || isNaN(n)) ? null : Math.max(1, Math.min(15, n));
+}
+function writeScore(idx, key, v){
   if (v === null) delete state.teams[idx].scores[key];
   else state.teams[idx].scores[key] = v;
   persist(`teams/${idx}/scores/${key}`, v);
   renderPreservingFocus();
+}
+function setSingleScore(idx, hole, val){
+  const sIdx = state.teams[idx].singles['s'+segOf(hole)];
+  if (sIdx===null || sIdx===undefined) return;
+  writeScore(idx, 'h'+hole+'p'+sIdx, clampScore(val));
+}
+function setScrambleScore(idx, hole, val){
+  writeScore(idx, 'h'+hole+'sc', clampScore(val));
 }
 
 function setSingle(idx, seg, val){
