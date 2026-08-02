@@ -42,8 +42,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Ar
 .hl-score.even{color:#fff}
 .hl-thru{font-size:11px;color:#a8c9b8;margin-top:2px}
 .tabs{display:flex;background:var(--brand-dark)}
-.tab{flex:1;padding:11px 4px;text-align:center;font-size:12px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:#8fb3a0;border:none;background:transparent;cursor:pointer;border-bottom:3px solid transparent}
+.tab{flex:1;padding:11px 2px;text-align:center;font-size:11px;font-weight:600;letter-spacing:.2px;text-transform:uppercase;color:#8fb3a0;border:none;background:transparent;cursor:pointer;border-bottom:3px solid transparent}
 .tab.on{color:#fff;border-bottom-color:var(--gold)}
+@media(max-width:400px){.tab{font-size:10px;letter-spacing:0}}
 
 /* ===== Layout ===== */
 .wrap{max-width:800px;margin:0 auto;padding:12px 12px 48px}
@@ -147,6 +148,28 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Ar
 .lb-sub{font-size:10.5px;color:var(--faint);margin-top:2px}
 .lb-thru{text-align:center;width:18%;font-size:11.5px;color:var(--muted)}
 .lb-score{text-align:right;width:22%}
+
+/* ===== Skins ===== */
+.sk-tally{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px}
+.sk-tally .c{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center}
+.sk-tally .c .n{font-size:11.5px;font-weight:700;color:var(--brand);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sk-tally .c .v{font-size:26px;font-weight:700;line-height:1.2;margin-top:2px}
+.sk-tally .c .s{font-size:10px;color:var(--faint)}
+.sk-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.sk-tbl th{font-size:9.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);background:#f3f6f4;padding:7px 8px;border-bottom:1px solid var(--border);text-align:left}
+.sk-tbl td{padding:8px;border-bottom:1px solid #edf0f4;vertical-align:middle}
+.sk-tbl tr:last-child td{border-bottom:none}
+.sk-tbl tr.won{background:#f4faf6}
+.sk-h{width:52px;font-weight:700;color:var(--brand);font-size:14px}
+.sk-h .p{display:block;font-size:9.5px;font-weight:600;color:var(--faint);letter-spacing:0}
+.sk-low{width:56px;text-align:center;font-weight:700;font-size:16px}
+.sk-low .r{display:block;font-size:9.5px;font-weight:700;color:var(--faint)}
+.sk-low.none{color:var(--faint);font-size:13px;font-weight:600}
+.sk-team{font-size:12px;font-weight:600;color:var(--text);line-height:1.35}
+.sk-team.none{color:var(--faint);font-weight:500}
+.sk-skin{width:56px;text-align:center}
+.sk-yes{color:var(--green);font-size:18px;font-weight:700}
+.sk-tie{color:var(--faint);font-size:9.5px;font-weight:700;letter-spacing:.4px}
 
 /* ===== Admin ===== */
 .alogin{max-width:300px;margin:36px auto;text-align:center}
@@ -428,8 +451,28 @@ function ranked(){
     });
 }
 
+/* ---------- Skins ----------
+   Low team score on a hole wins the skin. A tie means nobody wins it. */
+function skinsRows(){
+  const rows = [];
+  for (let h=0; h<NUM_HOLES; h++){
+    let best = null, winners = [];
+    state.teams.forEach((t,i)=>{
+      const r = holeResult(t, h);
+      if (!r.complete) return;
+      if (best===null || r.total < best){ best = r.total; winners = [i]; }
+      else if (r.total === best) winners.push(i);
+    });
+    rows.push({ h, best, winners, skin: best!==null && winners.length===1 });
+  }
+  return rows;
+}
+function skinsWonBy(rows, idx){
+  return rows.filter(r=>r.skin && r.winners[0]===idx).length;
+}
+
 /* ---------- View state ---------- */
-let view = 'teams';           // teams | leaderboard | admin
+let view = 'teams';           // teams | leaderboard | skins | admin
 let scoringIdx = null;
 let adminOk = false;
 let adminTab = 'teams';
@@ -461,6 +504,7 @@ function render(){
     <div class="tabs">
       <button class="tab ${view==='teams'?'on':''}" onclick="go('teams')">Teams</button>
       <button class="tab ${view==='leaderboard'?'on':''}" onclick="go('leaderboard')">Leaderboard</button>
+      <button class="tab ${view==='skins'?'on':''}" onclick="go('skins')">Skins</button>
       <button class="tab ${view==='admin'?'on':''}" onclick="go('admin')">Admin</button>
     </div>
   </div>
@@ -471,6 +515,7 @@ function render(){
   if (scoringIdx !== null) html += renderScorecard();
   else if (view === 'teams') html += renderTeams();
   else if (view === 'leaderboard') html += renderBoard();
+  else if (view === 'skins') html += renderSkins();
   else html += renderAdmin();
 
   html += `</div>`;
@@ -654,6 +699,55 @@ function renderBoard(){
       <td class="lb-score">${scoreHtml}</td>
     </tr>`;
   });
+  html += `</table></div>`;
+  return html;
+}
+
+function renderSkins(){
+  const rows = skinsRows();
+  const played = rows.filter(r=>r.best!==null).length;
+  const won = rows.filter(r=>r.skin).length;
+  const tied = played - won;
+
+  let html = `<div class="banner"><b>Skins:</b> the low team score on a hole wins that hole's skin. If two or more teams tie for low, the hole is carried as a push and nobody takes it.</div>`;
+
+  html += `<div class="sk-tally">`;
+  state.teams.forEach((t,i)=>{
+    const n = skinsWonBy(rows, i);
+    html += `<div class="c">
+      <div class="n">${esc(teamName(t,i))}</div>
+      <div class="v">${n}</div>
+      <div class="s">skin${n===1?'':'s'}</div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  html += `<div class="card">
+    <div class="card-hd"><span class="t">Skins by hole</span><span class="r">${won} won · ${tied} tied · ${NUM_HOLES-played} to play</span></div>
+    <table class="sk-tbl">
+      <tr><th>Hole</th><th style="text-align:center">Low</th><th>Team</th><th style="text-align:center">Skin</th></tr>`;
+
+  rows.forEach(r=>{
+    const par = teamPar(r.h);
+    let low, team, skin;
+    if (r.best===null){
+      low  = `<td class="sk-low none">—</td>`;
+      team = `<td class="sk-team none">Not played</td>`;
+      skin = `<td class="sk-skin"></td>`;
+    } else {
+      const rel = r.best - par;
+      low  = `<td class="sk-low">${r.best}<span class="r">${fmtRel(rel)}</span></td>`;
+      team = `<td class="sk-team">${r.winners.map(i=>esc(teamName(state.teams[i],i))).join('<br>')}</td>`;
+      skin = r.skin
+        ? `<td class="sk-skin"><span class="sk-yes">&#10003;</span></td>`
+        : `<td class="sk-skin"><span class="sk-tie">TIED</span></td>`;
+    }
+    html += `<tr class="${r.skin?'won':''}">
+      <td class="sk-h">${r.h+1}<span class="p">par ${state.par[r.h]}</span></td>
+      ${low}${team}${skin}
+    </tr>`;
+  });
+
   html += `</table></div>`;
   return html;
 }
