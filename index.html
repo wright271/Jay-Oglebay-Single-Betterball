@@ -148,6 +148,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Ar
 .lb-sub{font-size:10.5px;color:var(--faint);margin-top:2px}
 .lb-thru{text-align:center;width:18%;font-size:11.5px;color:var(--muted)}
 .lb-score{text-align:right;width:22%}
+.lb-tbl th{font-size:9.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);background:#f3f6f4;padding:7px 8px;border-bottom:1px solid var(--border);text-align:left}
+.lb-hcp{font-size:10px;color:var(--faint);font-weight:600;margin-top:2px}
+.lb-gross{text-align:center;width:20%}
+.lb-gross .v{font-size:13px;font-weight:700;color:var(--muted)}
+.lb-gross .r{display:block;font-size:10px;color:var(--faint);font-weight:600}
+.lb-net{text-align:right;width:24%}
+.lb-net .s{display:block;font-size:10px;color:var(--faint);font-weight:600;margin-top:2px}
+
+/* ===== Admin handicap ===== */
+.hcp-row{display:flex;align-items:center;gap:9px;margin-bottom:0}
+.hcp-row .l{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.team-card .hcp-row input{width:74px;flex:0 0 74px;margin-bottom:0;text-align:center;font-size:15px;font-weight:600}
+.hcp-adj{font-size:12px;font-weight:700;color:var(--brand);white-space:nowrap}
+.hcp-adj.zero{color:var(--faint)}
 
 /* ===== Skins ===== */
 .sk-tally{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px}
@@ -234,6 +248,7 @@ const SEG_LEN     = 6;                // single changes every 6 holes
 const NUM_SEGS    = NUM_HOLES / SEG_LEN;
 const COURSE_NAME = "Crispin Golf Course";
 const EVENT_DEFAULT = "Oglebay Cup";
+const HCP_BASE    = 30;               // a 30 team handicap plays even
 
 /* Crispin Golf Course, Oglebay — Wheeling, WV. Out 36 / In 35 / Par 71 */
 const PAR_DEFAULT  = [4,3,4,5,3,4,3,5,5, 3,4,5,3,4,4,4,4,4];
@@ -247,7 +262,8 @@ function defaultState(){
   return {
     eventName: EVENT_DEFAULT,
     teams: Array.from({length:NUM_TEAMS},()=>({
-      name: '', p1:'', p2:'', p3:'',
+      p1:'', p2:'', p3:'',
+      hcp: HCP_BASE, // team handicap; 30 plays even
       singles: {},   // s0 / s1 / s2  ->  0 | 1 | 2
       scores: {}     // "h0p1" -> single's gross ; "h0sc" -> pair's scramble score
     })),
@@ -308,9 +324,10 @@ function normalize(v){
       const raw = (t.singles||{})['s'+s];
       singles['s'+s] = (raw===0||raw===1||raw===2) ? raw : null;
     }
+    const hcp = parseInt(t.hcp);
     return {
-      name: t.name || '',
       p1: t.p1 || '', p2: t.p2 || '', p3: t.p3 || '',
+      hcp: isNaN(hcp) ? HCP_BASE : hcp,
       singles: singles,
       scores: t.scores || {}
     };
@@ -350,7 +367,6 @@ function shortName(t, pi){
   return ln || v;
 }
 function teamName(t, i){
-  if (String(t.name||'').trim()) return t.name.trim();
   const lns = PKEYS.map(k=>lastName(t[k])).filter(Boolean);
   return lns.length ? lns.join(' / ') : ('Team ' + (i+1));
 }
@@ -393,6 +409,21 @@ function holeResult(t, h){
   }
   return res;
 }
+
+/* Team handicap. 30 plays even; every 2 strokes of handicap either side of 30
+   moves the gross score by 1, rounded away from zero.
+     25  ->  5 under 30  ->  2.5  ->  +3 added to gross
+     41  -> 11 over  30  ->  5.5  ->  -6 taken off gross */
+function teamHcp(t){
+  const v = parseInt(t.hcp);
+  return isNaN(v) ? HCP_BASE : v;
+}
+function hcpAdjust(t){
+  const d = HCP_BASE - teamHcp(t);
+  if (d === 0) return 0;
+  return (d>0 ? 1 : -1) * Math.ceil(Math.abs(d)/2);
+}
+
 function teamResult(t){
   let strokes=0, parSum=0, thru=0, partial=false;
   for (let h=0; h<NUM_HOLES; h++){
@@ -400,8 +431,13 @@ function teamResult(t){
     if (r.complete){ strokes+=r.total; parSum+=r.par; thru++; }
     else if (r.any) partial = true;
   }
-  return { strokes, parSum, thru, partial,
-           toPar: thru ? strokes-parSum : 0,
+  const adj = hcpAdjust(t);
+  const toPar = thru ? strokes-parSum : 0;
+  return { strokes, parSum, thru, partial, adj,
+           hcp: teamHcp(t),
+           toPar,
+           net: thru ? strokes+adj : 0,
+           netToPar: thru ? toPar+adj : 0,
            started: thru>0 || partial,
            done: thru===NUM_HOLES };
 }
@@ -445,6 +481,7 @@ function ranked(){
   return state.teams.map((t,i)=>({team:t, idx:i, r:teamResult(t)}))
     .sort((a,b)=>{
       if (a.r.thru>0 !== b.r.thru>0) return a.r.thru>0 ? -1 : 1;
+      if (a.r.netToPar !== b.r.netToPar) return a.r.netToPar - b.r.netToPar;   // net decides the event
       if (a.r.toPar !== b.r.toPar) return a.r.toPar - b.r.toPar;
       if (a.r.thru !== b.r.thru) return b.r.thru - a.r.thru;
       return a.idx - b.idx;
@@ -492,10 +529,10 @@ function render(){
     <div class="hdr-lead">`;
   if (leader && leader.r.thru>0){
     html += `
-      <div class="hl-cap">Leader</div>
+      <div class="hl-cap">Leader · Net</div>
       <div class="hl-team">${esc(teamName(leader.team, leader.idx))}</div>
-      <div class="hl-score ${relClass(leader.r.toPar)}">${fmtRel(leader.r.toPar)}</div>
-      <div class="hl-thru">thru ${leader.r.thru}</div>`;
+      <div class="hl-score ${relClass(leader.r.netToPar)}">${fmtRel(leader.r.netToPar)}</div>
+      <div class="hl-thru">thru ${leader.r.thru} · gross ${fmtRel(leader.r.toPar)}</div>`;
   } else {
     html += `<div class="hl-cap">No scores yet</div><div class="hl-thru">Tap a team below to start scoring</div>`;
   }
@@ -529,8 +566,8 @@ function renderTeams(){
   state.teams.forEach((t,i)=>{
     const r = teamResult(t);
     let pill;
-    if (r.done) pill = `<span class="pill ${relClass(r.toPar)}">${fmtRel(r.toPar)}</span><div class="tr-thru">final</div>`;
-    else if (r.thru>0) pill = `<span class="pill live">${fmtRel(r.toPar)}</span><div class="tr-thru">thru ${r.thru}</div>`;
+    if (r.done) pill = `<span class="pill ${relClass(r.netToPar)}">${fmtRel(r.netToPar)}</span><div class="tr-thru">net final · gross ${fmtRel(r.toPar)}</div>`;
+    else if (r.thru>0) pill = `<span class="pill live">${fmtRel(r.netToPar)}</span><div class="tr-thru">net thru ${r.thru} · gross ${fmtRel(r.toPar)}</div>`;
     else pill = `<span class="pill pend">TAP TO SCORE</span>`;
     const roster = rosterLine(t);
     html += `
@@ -559,8 +596,12 @@ function renderScorecard(){
     <div class="sc-fmt">Team ${i+1} of ${NUM_TEAMS} · Single + Scramble</div>
     <div class="sc-team">${esc(teamName(t,i))}</div>
     <div class="sc-status">
-      <span class="lbl">Team score</span>
-      <span class="val">${r.thru>0 ? fmtRel(r.toPar) + ' · ' + r.strokes + ' strokes · thru ' + r.thru + (r.done?' (final)':'') : 'NOT STARTED'}</span>
+      <span class="lbl">Gross</span>
+      <span class="val">${r.thru>0 ? r.strokes + ' · ' + fmtRel(r.toPar) + ' · thru ' + r.thru + (r.done?' (final)':'') : 'NOT STARTED'}</span>
+    </div>
+    <div class="sc-status" style="margin-top:6px">
+      <span class="lbl">Net · hcp ${r.hcp} (${r.adj>0?'+':''}${r.adj})</span>
+      <span class="val">${r.thru>0 ? r.net + ' · ' + fmtRel(r.netToPar) : '—'}</span>
     </div>
     <div class="fmt-note">Two boxes per hole: the <b>single's</b> own gross score, and the <b>scramble</b> score the other two make together (both tee off, play the best ball in, one score). They add up against double par — ${totalTeamPar()} for the round.</div>
   </div>`;
@@ -671,35 +712,47 @@ function renderBoard(){
   if (leader && leader.r.thru>0){
     let gap = '';
     if (rk.length>1 && rk[1].r.thru>0){
-      const d = rk[1].r.toPar - leader.r.toPar;
-      gap = d===0 ? 'All square' : ('Leading by ' + d);
+      const d = rk[1].r.netToPar - leader.r.netToPar;
+      gap = d===0 ? 'All square on net' : ('Leading by ' + d + ' net');
     }
     html += `
     <div class="total-card">
-      <div class="tc-cap">Leader</div>
+      <div class="tc-cap">Leader · Net</div>
       <div class="tc-name">${esc(teamName(leader.team, leader.idx))}</div>
-      <div class="tc-pts">${fmtRel(leader.r.toPar)} <span style="font-size:14px;font-weight:600;color:#8fb3a0">thru ${leader.r.thru}</span></div>
+      <div class="tc-pts">${fmtRel(leader.r.netToPar)} <span style="font-size:14px;font-weight:600;color:#8fb3a0">thru ${leader.r.thru}</span></div>
+      <div class="tc-gap">gross ${fmtRel(leader.r.toPar)} · hcp ${leader.r.hcp} (${leader.r.adj>0?'+':''}${leader.r.adj})</div>
       ${gap?`<div class="tc-gap">${esc(gap)}</div>`:''}
     </div>`;
   }
   html += `<div class="card">
-    <div class="card-hd"><span class="t">Leaderboard</span><span class="r">${NUM_TEAMS} teams · par ${totalTeamPar()}</span></div>
-    <table class="lb-tbl">`;
+    <div class="card-hd"><span class="t">Leaderboard · net decides</span><span class="r">par ${totalTeamPar()}</span></div>
+    <table class="lb-tbl">
+      <tr><th></th><th>Team</th><th style="text-align:center">Gross</th><th style="text-align:right">Net</th></tr>`;
   rk.forEach((row,pos)=>{
     const r = row.r, t = row.team;
     const rankLbl = r.thru>0 ? (pos+1) : '—';
-    const scoreHtml = r.thru>0
-      ? `<span class="pill ${r.done?relClass(r.toPar):'live'}">${fmtRel(r.toPar)}</span><div class="tr-thru">${r.strokes}</div>`
-      : `<span class="pill pend">—</span>`;
     const roster = rosterLine(t);
+    let grossHtml, netHtml;
+    if (r.thru>0){
+      grossHtml = `<div class="v">${r.strokes}</div><span class="r">${fmtRel(r.toPar)}</span>`;
+      netHtml = `<span class="pill ${r.done?relClass(r.netToPar):'live'}">${fmtRel(r.netToPar)}</span><span class="s">${r.net}</span>`;
+    } else {
+      grossHtml = `<div class="v" style="color:var(--faint)">—</div>`;
+      netHtml = `<span class="pill pend">—</span>`;
+    }
     html += `<tr>
       <td class="lb-rank">${rankLbl}</td>
-      <td><div class="lb-team">${esc(teamName(t,row.idx))}</div>${roster?`<div class="lb-sub">${esc(roster)}</div>`:''}</td>
-      <td class="lb-thru">${r.thru>0 ? 'thru '+r.thru : ''}</td>
-      <td class="lb-score">${scoreHtml}</td>
+      <td>
+        <div class="lb-team">${esc(teamName(t,row.idx))}</div>
+        ${roster?`<div class="lb-sub">${esc(roster)}</div>`:''}
+        <div class="lb-hcp">hcp ${r.hcp} · ${r.adj>0?'+':''}${r.adj}${r.thru>0?' · thru '+r.thru:''}</div>
+      </td>
+      <td class="lb-gross">${grossHtml}</td>
+      <td class="lb-net">${netHtml}</td>
     </tr>`;
   });
   html += `</table></div>`;
+  html += `<div class="sess-meta">Net is gross adjusted for team handicap — ${HCP_BASE} plays even, and every 2 strokes either side of it moves the score by 1 (rounded up). Net decides the event; gross is shown for information.</div>`;
   return html;
 }
 
@@ -709,7 +762,7 @@ function renderSkins(){
   const won = rows.filter(r=>r.skin).length;
   const tied = played - won;
 
-  let html = `<div class="banner"><b>Skins:</b> the low team score on a hole wins that hole's skin. If two or more teams tie for low, the hole is carried as a push and nobody takes it.</div>`;
+  let html = `<div class="banner"><b>Skins:</b> the low <b>gross</b> team score on a hole wins that hole's skin — handicaps don't apply here, since the adjustment is a whole-round number. If two or more teams tie for low, the hole is carried as a push and nobody takes it.</div>`;
 
   html += `<div class="sk-tally">`;
   state.teams.forEach((t,i)=>{
@@ -769,23 +822,29 @@ function renderAdmin(){
   </div>`;
 
   if (adminTab==='teams'){
-    html += `<div class="sess-meta">Three players per team. Leave the team name blank to use last names (e.g. "Smith / Jones / Brown"). Edits save instantly for everyone.</div>`;
+    html += `<div class="sess-meta">Three players per team — the team is named from their last names (e.g. "Smith / Jones / Brown"). Team handicap of ${HCP_BASE} plays even — every 2 strokes either side moves the gross score by 1, rounded up. Edits save instantly for everyone.</div>`;
     state.teams.forEach((t,i)=>{
-      const named = PKEYS.some(k=>String(t[k]||'').trim()) || String(t.name||'').trim();
+      const named = PKEYS.some(k=>String(t[k]||'').trim());
+      const adj = hcpAdjust(t);
+      const adjTxt = adj===0 ? 'plays even' : `${adj>0?'+':''}${adj} to gross`;
       html += `<div class="team-card">
         <div class="tc-hd">Team ${i+1}</div>
         <div class="tc-derived ${named?'':'empty'}">${esc(named ? teamName(t,i) : 'Team ' + (i+1) + ' — add players')}</div>
-        <input value="${esc(t.name)}" onchange="setTeamField(${i},'name',this.value)" placeholder="Team name (optional)">
         <input value="${esc(t.p1)}" onchange="setTeamField(${i},'p1',this.value)" placeholder="Player 1">
         <input value="${esc(t.p2)}" onchange="setTeamField(${i},'p2',this.value)" placeholder="Player 2">
         <input value="${esc(t.p3)}" onchange="setTeamField(${i},'p3',this.value)" placeholder="Player 3">
+        <div class="hcp-row" style="margin-top:8px">
+          <span class="l">Team hcp</span>
+          <input type="number" inputmode="numeric" min="0" max="99" value="${teamHcp(t)}" onchange="setHcp(${i},this.value)">
+          <span class="hcp-adj ${adj===0?'zero':''}">${esc(adjTxt)}</span>
+        </div>
       </div>`;
     });
   }
 
   if (adminTab==='bulk'){
-    html += `<div class="sess-meta">One team per line, players separated by commas. Up to ${NUM_TEAMS} lines. An optional team name goes first with a colon:<br>
-      <code>Smith, Jones, Brown</code><br><code>The Ringers: Smith, Jones, Brown</code></div>`;
+    html += `<div class="sess-meta">One team per line, three players separated by commas. Up to ${NUM_TEAMS} lines:<br>
+      <code>Alex Scarcella, Bob Jones, Chris Brown</code></div>`;
     html += `<textarea class="bulk" id="bulkbox" placeholder="Smith, Jones, Brown\nDoe, Rivera, Chen"></textarea>`;
     html += `<div style="margin-top:10px;display:flex;gap:8px;align-items:center">
       <button class="btn" onclick="applyBulk()">Apply roster</button>
@@ -870,6 +929,14 @@ function setTeamField(idx, field, val){
   render();
 }
 
+function setHcp(idx, val){
+  const n = parseInt(val);
+  const v = isNaN(n) ? HCP_BASE : Math.max(0, Math.min(99, n));
+  state.teams[idx].hcp = v;
+  persist(`teams/${idx}/hcp`, v);
+  render();
+}
+
 function setEventName(val){
   state.eventName = String(val||'').trim() || EVENT_DEFAULT;
   persist('eventName', state.eventName);
@@ -884,11 +951,7 @@ function setPar(hole, val){
 }
 
 function fillBulk(){
-  const lines = state.teams.map(t=>{
-    const ns = PKEYS.map(k=>String(t[k]||'').trim()).filter(Boolean).join(', ');
-    const nm = String(t.name||'').trim();
-    return nm ? (nm + ': ' + ns) : ns;
-  });
+  const lines = state.teams.map(t=>PKEYS.map(k=>String(t[k]||'').trim()).filter(Boolean).join(', '));
   document.getElementById('bulkbox').value = lines.join('\n');
 }
 
@@ -899,14 +962,9 @@ function applyBulk(){
   if (lines.length > NUM_TEAMS){ bulkMsg = `Too many lines (${lines.length}) — max ${NUM_TEAMS}.`; render(); return; }
   if (!confirm(`Replace the roster for the first ${lines.length} team(s)?`)) return;
   lines.forEach((line, i)=>{
-    let name = '', rest = line;
-    const c = line.indexOf(':');
-    if (c > -1){ name = line.slice(0,c).trim(); rest = line.slice(c+1); }
-    const ps = rest.split(',').map(s=>s.trim()).filter(Boolean).slice(0, TEAM_SIZE);
+    const ps = line.split(',').map(s=>s.trim()).filter(Boolean).slice(0, TEAM_SIZE);
     const t = state.teams[i];
-    t.name = name;
     PKEYS.forEach((k, pi)=>{ t[k] = ps[pi] || ''; });
-    persist(`teams/${i}/name`, t.name);
     PKEYS.forEach(k=> persist(`teams/${i}/${k}`, t[k]));
   });
   bulkMsg = `Applied ${lines.length} team(s).`;
