@@ -413,18 +413,15 @@ function holeResult(t, h){
   return res;
 }
 
-/* Team handicap. 30 plays even; every 2 strokes of handicap either side of 30
-   moves the gross score by 1, rounded away from zero.
-     25  ->  5 under 30  ->  2.5  ->  +3 added to gross
-     41  -> 11 over  30  ->  5.5  ->  -6 taken off gross */
+/* Team handicap. 30 plays even; the difference from 30 goes straight onto the gross.
+     27  ->  3 under 30  ->  +3 added to gross
+     40  -> 10 over  30  ->  -10 taken off gross */
 function teamHcp(t){
   const v = parseInt(t.hcp);
   return isNaN(v) ? HCP_BASE : v;
 }
 function hcpAdjust(t){
-  const d = HCP_BASE - teamHcp(t);
-  if (d === 0) return 0;
-  return (d>0 ? 1 : -1) * Math.ceil(Math.abs(d)/2);
+  return HCP_BASE - teamHcp(t);
 }
 
 function teamResult(t){
@@ -626,7 +623,7 @@ function renderBoard(){
       ${net}${gross}
     </div>`;
   });
-  html += `<div class="bfoot">Net is gross adjusted for team handicap — ${HCP_BASE} plays even, and every 2 strokes either side moves the score by 1, rounded up. Net decides the event.</div>`;
+  html += `<div class="bfoot">Net is gross adjusted for team handicap — ${HCP_BASE} plays even, and the difference from ${HCP_BASE} goes straight onto the gross. Net decides the event.</div>`;
   html += `</div>`;
   return html;
 }
@@ -871,7 +868,7 @@ function renderAdmin(){
   </div>`;
 
   if (adminTab==='teams'){
-    html += `<div class="sess-meta">Three players per team — the team is named from their last names (e.g. "Smith / Jones / Brown"). Team handicap of ${HCP_BASE} plays even — every 2 strokes either side moves the gross score by 1, rounded up. Edits save instantly for everyone.</div>`;
+    html += `<div class="sess-meta">Three players per team — the team is named from their last names (e.g. "Smith / Jones / Brown"). Team handicap of ${HCP_BASE} plays even — the difference from ${HCP_BASE} is applied straight to the gross score. Edits save instantly for everyone.</div>`;
     state.teams.forEach((t,i)=>{
       const named = PKEYS.some(k=>String(t[k]||'').trim());
       const adj = hcpAdjust(t);
